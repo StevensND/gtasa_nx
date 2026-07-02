@@ -144,6 +144,12 @@ static float CDraw__SetFOV(float fov) {
       (((*CDraw__ms_fAspectRatio - 1.3333f) * 11.0f) / 0.44444f) + fov;
   fake_fov =
       (((1.0f / *CDraw__ms_fAspectRatio - 1.3333f) * 11.0f) / 0.44444f) + fov;
+  // Clamp so the CCamera stub's 70/fake_fov can't go negative or blow up at
+  // extreme zoom (sniper scope / camera at max zoom): fake_fov drops below zero
+  // for a tiny fov, which flips the frustum and makes the whole world vanish.
+  // (JPatch clamps the FOV to [1,170] for the same reason.)
+  if (fake_fov < 1.0f) fake_fov = 1.0f;
+  else if (fake_fov > 170.0f) fake_fov = 170.0f;
   return fake_fov;
 }
 
@@ -310,7 +316,6 @@ static void ProcessSwimmingResistance(void *task, void *ped) {
     PED_VEL(ped).z = sw_max(PED_VEL(ped).z, 0.0f);
 }
 
-
 // Cheats -- restore PC-style cheat codes typed on the Switch on-screen keyboard.
 static const uint32_t cheat_hash_keys[] = {
     0xDE4B237D, 0xB22A28D1, 0x5A783FAE,
@@ -358,6 +363,111 @@ static void CCheat__DoCheats(void) {
     if (CCheat__AddToCheatString) CCheat__AddToCheatString(c);
   }
   cheat_ready = 0;
+}
+
+// Controller remap. The engine maps game actions (HIDMapping) to buttons via
+// CHIDJoystick::AddMapping(this, buttonId, action). Its subclass ctors build a
+// default (Xbox-ish) layout with overlaps; we reimplement AddMapping so every
+// action's buttonId is taken from a remap table (built-in PSV layout, overridable
+// by an optional text file). buttonId space (engine ButtonID): CROSS=0 CIRCLE=1
+// SQUARE=2 TRIANGLE=3 START=4 SELECT=5 L1=6 R1=7 DPAD_UP=8 DPAD_DOWN=9 DPAD_LEFT=10
+// DPAD_RIGHT=11 L3=12 R3=13 L2=68 R2=69 (L2/R2 = analog triggers on Switch).
+#define REMAP_UNSET (-2)
+static int g_remap[256]; // [HIDMapping] -> buttonId, or REMAP_UNSET to keep default
+
+static void controls_defaults(void) {
+  for (int i = 0; i < 256; i++) g_remap[i] = REMAP_UNSET;
+  // PSV layout (gtasa_vita/gamefiles/controls.txt), joystick-mapped actions only:
+  g_remap[1]  = 1;   // ATTACK       -> CIRCLE
+  g_remap[2]  = 0;   // SPRINT       -> CROSS
+  g_remap[3]  = 2;   // JUMP         -> SQUARE
+  g_remap[4]  = 12;  // CROUCH       -> L3
+  g_remap[5]  = 3;   // ENTER_CAR    -> TRIANGLE
+  g_remap[6]  = 68;  // BRAKE        -> L2 (ZL analog trigger)
+  g_remap[7]  = 2;   // HANDBRAKE    -> SQUARE
+  g_remap[8]  = 69;  // ACCELERATE   -> R2 (ZR analog trigger)
+  g_remap[9]  = 5;   // CAMERA_CLOSER-> SELECT
+  g_remap[10] = 5;   // CAMERA_FARTHER-> SELECT
+  g_remap[11] = 12;  // HORN         -> L3
+  g_remap[12] = 8;   // RADIO_PREV   -> DPAD_UP
+  g_remap[13] = 9;   // RADIO_NEXT   -> DPAD_DOWN
+  g_remap[14] = 8;   // VITAL_STATS  -> DPAD_UP
+  g_remap[15] = 69;  // NEXT_WEAPON  -> R2
+  g_remap[16] = 68;  // PREV_WEAPON  -> L2
+  g_remap[17] = 4;   // RADAR        -> START
+  g_remap[18] = 13;  // PED_LOOK_BACK-> R3
+  g_remap[19] = 6;   // VEH_LOOK_LEFT-> L1 (off the ZL trigger so aim/R1 has no analog)
+  g_remap[20] = 7;   // VEH_LOOK_RIGHT-> R1 (context with TARGETING: aim on foot, look in car)
+  g_remap[22] = 3;   // MISSION      -> TRIANGLE
+  g_remap[23] = 13;  // VIGILANTE    -> R3
+  g_remap[33] = 6;   // SWAP_WEAPONS  -> L1
+  g_remap[34] = 2;   // WEAPON_ZOOM_IN-> SQUARE
+  g_remap[35] = 0;   // WEAPON_ZOOM_OUT-> CROSS
+  g_remap[36] = 7;   // TARGETING(aim)-> R1
+  g_remap[37] = 10;  // VEHICLE_BOMB  -> DPAD_LEFT
+}
+
+static const struct { const char *n; int v; } remap_actions[] = {
+  {"MAPPING_ATTACK",1},{"MAPPING_SPRINT",2},{"MAPPING_JUMP",3},{"MAPPING_CROUCH",4},
+  {"MAPPING_ENTER_CAR",5},{"MAPPING_BRAKE",6},{"MAPPING_HANDBRAKE",7},{"MAPPING_ACCELERATE",8},
+  {"MAPPING_CAMERA_CLOSER",9},{"MAPPING_CAMERA_FARTHER",10},{"MAPPING_HORN",11},
+  {"MAPPING_RADIO_PREV_STATION",12},{"MAPPING_RADIO_NEXT_STATION",13},{"MAPPING_VITAL_STATS",14},
+  {"MAPPING_NEXT_WEAPON",15},{"MAPPING_PREV_WEAPON",16},{"MAPPING_RADAR",17},
+  {"MAPPING_PED_LOOK_BACK",18},{"MAPPING_VEHICLE_LOOK_LEFT",19},{"MAPPING_VEHICLE_LOOK_RIGHT",20},
+  {"MAPPING_MISSION_START_AND_CANCEL",22},{"MAPPING_MISSION_START_AND_CANCEL_VIGILANTE",23},
+  {"MAPPING_SWAP_WEAPONS_AND_PURCHASE",33},{"MAPPING_WEAPON_ZOOM_IN",34},{"MAPPING_WEAPON_ZOOM_OUT",35},
+  {"MAPPING_ENTER_AND_EXIT_TARGETING",36},{"MAPPING_VEHICLE_BOMB",37},
+};
+static const struct { const char *n; int v; } remap_buttons[] = {
+  {"BUTTON_UNUSED",-1},{"BUTTON_CROSS",0},{"BUTTON_CIRCLE",1},{"BUTTON_SQUARE",2},
+  {"BUTTON_TRIANGLE",3},{"BUTTON_START",4},{"BUTTON_SELECT",5},{"BUTTON_L1",6},{"BUTTON_R1",7},
+  {"DPAD_UP",8},{"DPAD_DOWN",9},{"DPAD_LEFT",10},{"DPAD_RIGHT",11},{"BUTTON_L3",12},
+  {"BUTTON_R3",13},{"BUTTON_L2",68},{"BUTTON_R2",69},
+};
+
+// Load overrides from a text file: "MAPPING_XXX BUTTON_YYY" or "MAPPING_XXX=BUTTON_YYY"
+// per line (';'/'#' comments). Absent file -> built-in PSV defaults stand.
+static void controls_load(const char *path) {
+  controls_defaults();
+  FILE *f = fopen(path, "r");
+  if (!f) return;
+  char line[256], a[64], b[64];
+  while (fgets(line, sizeof(line), f)) {
+    if (line[0] == ';' || line[0] == '#') continue;
+    for (char *p = line; *p; p++) if (*p == '=') *p = ' ';
+    a[0] = b[0] = 0;
+    if (sscanf(line, "%63s %63s", a, b) != 2) continue;
+    int mv = -1, bv = REMAP_UNSET;
+    for (unsigned i = 0; i < sizeof(remap_actions)/sizeof(*remap_actions); i++)
+      if (!strcmp(a, remap_actions[i].n)) { mv = remap_actions[i].v; break; }
+    for (unsigned i = 0; i < sizeof(remap_buttons)/sizeof(*remap_buttons); i++)
+      if (!strcmp(b, remap_buttons[i].n)) { bv = remap_buttons[i].v; break; }
+    if (mv >= 0 && mv < 256 && bv != REMAP_UNSET) g_remap[mv] = bv;
+  }
+  fclose(f);
+}
+
+// Reimplements CHIDJoystick::AddMapping (arm64 layout: cap@+8, count@+12, array@+16;
+// entry = 20 bytes {int buttonId; int action; 12 bytes analog cache}). Overrides the
+// buttonId from g_remap so every subclass ctor gets our layout.
+static void CHIDJoystick__AddMapping(void *self, int buttonId, int action) {
+  if (action >= 0 && action < 256 && g_remap[action] != REMAP_UNSET)
+    buttonId = g_remap[action];
+  int cap = *(int *)((char *)self + 8);
+  int cnt = *(int *)((char *)self + 12);
+  char *arr = *(char **)((char *)self + 16);
+  if (cnt + 1 > cap) {
+    cap = cnt + 8;
+    arr = realloc(arr, (size_t)cap * 20);
+    if (!arr) return;
+    *(int *)((char *)self + 8) = cap;
+    *(char **)((char *)self + 16) = arr;
+  }
+  char *e = arr + (size_t)cnt * 20;
+  *(int *)(e + 0) = buttonId;
+  *(int *)(e + 4) = action;
+  memset(e + 8, 0, 12);
+  *(int *)((char *)self + 12) = cnt + 1;
 }
 
 void patch_game(void) {
@@ -467,6 +577,13 @@ void patch_game(void) {
                (uintptr_t)CCheat__DoCheats);
   }
 
+  // Controller remap: load the layout (built-in PSV default + optional controls.txt)
+  // and replace CHIDJoystick::AddMapping so every joystick built at runtime uses it.
+  controls_load("controls.txt");
+  if (so_try_find_addr_rx(&game_mod, "_ZN12CHIDJoystick10AddMappingEi10HIDMapping"))
+    hook_arm64(so_find_addr(&game_mod, "_ZN12CHIDJoystick10AddMappingEi10HIDMapping"),
+               (uintptr_t)CHIDJoystick__AddMapping);
+
   // Emergency-vehicle / widescreen FOV fix
   if (so_try_find_addr_rx(&game_mod, "_ZN5CDraw6SetFOVEfb")) {
     CDraw__ms_fFOV = (float *)so_find_addr_rx(&game_mod, "_ZN5CDraw7ms_fFOVE");
@@ -489,6 +606,17 @@ void patch_game(void) {
     hook_arm64(so_find_addr(&game_mod, "_Z14AND_FileUpdated"), (uintptr_t)ret0);
   if (so_try_find_addr_rx(&game_mod, "_Z17AND_BillingUpdateb"))
     hook_arm64(so_find_addr(&game_mod, "_Z17AND_BillingUpdateb"), (uintptr_t)ret0);
+
+  // Sprinting on any surface is allowed  [OBSERVABLE: sprint on sand/grass
+  // without slowing down]
+  if (so_try_find_addr_rx(&game_mod, "_ZN14SurfaceInfos_c12CantSprintOnEj"))
+    hook_arm64(so_find_addr(&game_mod, "_ZN14SurfaceInfos_c12CantSprintOnEj"),
+               (uintptr_t)ret0);
+
+  // Remove the "ExtraAirResistance" flag  [OBSERVABLE: player movement feel]
+  if (so_try_find_addr_rx(&game_mod, "_ZN10CCullZones29DoExtraAirResistanceForPlayerEv"))
+    hook_arm64(so_find_addr(&game_mod, "_ZN10CCullZones29DoExtraAirResistanceForPlayerEv"),
+               (uintptr_t)ret0);
 
   // No adjustable HUD (skip saving/repositioning of movable touch widgets)
   if (so_try_find_addr_rx(&game_mod, "_ZN14CAdjustableHUD10SaveToDiskEv"))

@@ -27,7 +27,7 @@ To install:
    * the contents of the OBB (`main.*.obb` — it is just a ZIP; the `data/`,
      `models/`, `texdb/`, `audio/`, `text/`, `anim/`, `es2/`, … trees inside it
      go directly in `/switch/gtasa/`).
-4. Copy `gtasa_nx.nro` into `/switch/gtasa/`.
+4. Copy `gtasa_nx.nro` and `controls.txt` into `/switch/gtasa/`.
 
 Your SD card should end up with at least `/switch/gtasa/gtasa_nx.nro`,
 `/switch/gtasa/libGame.so`, `/switch/gtasa/libc++_shared.so`, and the extracted
