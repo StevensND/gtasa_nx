@@ -139,7 +139,28 @@ static float *CDraw__ms_fAspectRatio;
 // hidden (not static): referenced by fov_stub.s; hidden keeps adrp/add PIC-valid
 __attribute__((visibility("hidden"))) float fake_fov;
 
+// Radar fix.
+static uintptr_t g_radar_mpw_base;
+
 static float CDraw__SetFOV(float fov) {
+  if (g_radar_mpw_base) {
+    void *w = *(void **)(g_radar_mpw_base + 1288);
+    if (w) {
+      // Radar layout from Adjustable.cfg (640x448 virtual space): centre (76,370),
+      // half-extent (44,44). DrawRadar reads two opposite corners at widget+44
+      // (d2 = x,y) and +52 (d3 = x,y) in screen pixels, deriving centre=(d2+d3)/2
+      // and half-extent=|d2-d3|/2. Scale to the render resolution.
+      const float sx = (float)screen_width / 640.0f;
+      const float sy = (float)screen_height / 448.0f;
+      const float cx = 76.0f * sx, cy = 370.0f * sy;
+      const float hx = 44.0f * sx, hy = 44.0f * sy;
+      float *r = (float *)((char *)w + 44);
+      r[0] = cx - hx; // d2.x
+      r[1] = cy - hy; // d2.y
+      r[2] = cx + hx; // d3.x
+      r[3] = cy + hy; // d3.y
+    }
+  }
   *CDraw__ms_fFOV =
       (((*CDraw__ms_fAspectRatio - 1.3333f) * 11.0f) / 0.44444f) + fov;
   fake_fov =
@@ -151,6 +172,17 @@ static float CDraw__SetFOV(float fov) {
   if (fake_fov < 1.0f) fake_fov = 1.0f;
   else if (fake_fov > 170.0f) fake_fov = 170.0f;
   return fake_fov;
+}
+
+// Radar alpha fix.
+__attribute__((visibility("hidden"))) uintptr_t drawradar_cont;
+extern void CHud__DrawRadar_stub(void); // chud_drawradar_stub.s
+void radar_setup(void) {
+  if (!g_radar_mpw_base)
+    return;
+  void *w = *(void **)(g_radar_mpw_base + 1288);
+  if (w)
+    *((unsigned char *)w + 88) = 255;
 }
 
 // Half 2 of the FOV fix.
@@ -186,7 +218,6 @@ void CPlane__nozzle_manual(void *self, int pad) {
   *prev = *noz;
   *noz = (int16_t)v;
 }
-
 
 // Water physics fix
 typedef struct { float x, y, z; } SwVec;
@@ -678,6 +709,18 @@ void patch_game(void) {
         (float *)so_find_addr_rx(&game_mod, "_ZN5CDraw15ms_fAspectRatioE");
     hook_arm64(so_find_addr(&game_mod, "_ZN5CDraw6SetFOVEfb"),
                (uintptr_t)CDraw__SetFOV);
+
+    // Radar fix
+    if (so_try_find_addr_rx(&game_mod, "_ZN15CTouchInterface10m_pWidgetsE"))
+      g_radar_mpw_base =
+          so_find_addr_rx(&game_mod, "_ZN15CTouchInterface10m_pWidgetsE");
+
+    // Radar alpha fix
+    if (so_try_find_addr_rx(&game_mod, "_ZN4CHud9DrawRadarEv")) {
+      drawradar_cont = so_find_addr_rx(&game_mod, "_ZN4CHud9DrawRadarEv") + 16;
+      hook_arm64(so_find_addr(&game_mod, "_ZN4CHud9DrawRadarEv"),
+                 (uintptr_t)CHud__DrawRadar_stub);
+    }
 
     // half 2
     if (so_try_find_addr_rx(&game_mod, "_ZN7CCamera7ProcessEv")) {
