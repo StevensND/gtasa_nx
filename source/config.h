@@ -48,6 +48,7 @@ typedef struct {
   int remove_air_resistance; // CCullZones::DoExtraAirResistanceForPlayer -> ret0
   int show_wanted_stars;     // CWidgetPlayerInfo::DrawWanted: always draw the stars
   int disable_ped_spec;      // BuildPixelSource: drop BONE3|BONE4 from the spec gate
+  int no_offscreen_despawn;  // cars/peds don't despawn off-screen (re3); perf cost
 } Config;
 
 extern Config config;

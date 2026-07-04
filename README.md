@@ -56,6 +56,8 @@ The port has a config file at `/switch/gtasa/config.txt`, created on first run:
 * `remove_air_resistance` — `0` Remove "ExtraAirResistance" flag
 * `show_wanted_stars` — `0` Always drawable wanted stars
 * `disable_ped_spec` — `1` Removed specular lighting on pedestrians
+* `no_offscreen_despawn` — `0` Cars and peds don't despawn when you look away
+
 ### How to build
 
 You're going to need devkitA64 and the following packages/libraries:

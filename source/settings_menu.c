@@ -75,6 +75,7 @@ void settings_menu_maybe_show(void) {
       {"Remove extra air resistance", &config.remove_air_resistance},
       {"Always show wanted stars", &config.show_wanted_stars},
       {"Disable ped specular shine", &config.disable_ped_spec},
+      {"No off-screen despawn", &config.no_offscreen_despawn},
       {"Trilinear filtering", &config.trilinear_filter},
       {"FPS counter (may stall)", &config.show_fps},
   };

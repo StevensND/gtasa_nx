@@ -63,6 +63,11 @@ volatile int g_l3_down = 0;
 // hooks/game.c (pressing it during auto-aim releases the lock into free aim).
 volatile int g_dpad_down = 0;
 
+// L1/R1 (shoulder) held state, published each poll. Read by the plane rudder
+// (hooks/game.c CPlane__rudder_turret_input) to yaw the Hydra/planes from L1/R1.
+volatile int g_l1_down = 0;
+volatile int g_r1_down = 0;
+
 // provide replacement heap init function to separate newlib heap from the .so
 void __libnx_initheap(void) {
   void *addr;
@@ -411,6 +416,8 @@ static void update_gamepad(void) {
   g_r3_down = (down & HidNpadButton_StickR) != 0;
   g_l3_down = (down & HidNpadButton_StickL) != 0;
   g_dpad_down = (down & HidNpadButton_Down) != 0; // free-aim trigger (hooks/game.c)
+  g_l1_down = (down & HidNpadButton_L) != 0;       // plane rudder yaw (hooks/game.c)
+  g_r1_down = (down & HidNpadButton_R) != 0;
 
   const float scale = 1.f / 32767.0f;
   const HidAnalogStickState ls = padGetStickPos(&pad, 0);

@@ -296,6 +296,21 @@ void radar_setup(void) {
 __attribute__((visibility("hidden"))) uintptr_t ccamera_fov_ret;
 extern void CCamera__Process_fov_stub(void); // fov_stub.s
 
+// Taxi "for hire" roof light (JPatch TaxiLights), removed on mobile.
+extern void CAutomobile__Render_orig(void *self); // taxi_light_stub.s
+__attribute__((visibility("hidden"))) uintptr_t caut_render_cont;
+static void (*g_set_taxi_light)(void *self, int on); // CAutomobile::SetTaxiLight(bool)
+void CAutomobile__Render_hook(void *self) {
+  CAutomobile__Render_orig(self);
+  uint16_t model = *(uint16_t *)((char *)self + 0x32);
+  if (model == 420 || model == 438) {
+    void *driver = *(void **)((char *)self + 1440);
+    unsigned char numPass = *(unsigned char *)((char *)self + 1512);
+    float health = *(float *)((char *)self + 1588);
+    g_set_taxi_light(self, (driver && numPass == 0 && health > 0.0f) ? 1 : 0);
+  }
+}
+
 // PS2-style corona rotation (see corona_ps2_stub.s). Ported from JPatch
 __attribute__((visibility("hidden"))) uintptr_t corona_ps2_ret;
 extern void CCoronas__Render_ps2corona_stub(void); // corona_ps2_stub.s
@@ -313,6 +328,18 @@ extern void CCam__FollowCar_ymov_stub(void); // ccam_ymov_stub.s
 extern volatile float g_right_stick_y; // main.c: right stick Y in [-1,1], up<0
 __attribute__((visibility("hidden"))) uintptr_t cplane_nozzle_ret;
 extern void CPlane__nozzle_stub(void); // cplane_nozzle_stub.s
+
+// Hydra/plane yaw on L1/R1.
+__attribute__((visibility("hidden"))) uintptr_t cplane_rudder_ret;
+extern void CPlane__rudder_turret_stub(void); // cplane_rudder_stub.s
+extern volatile int g_l1_down, g_r1_down;     // main.c: physical L1/R1 held
+int CPlane__rudder_turret_input(void) {
+  if (g_r1_down)
+    return 128; // R1 -> yaw right
+  if (g_l1_down)
+    return -128; // L1 -> yaw left
+  return 0;
+}
 
 // Rotate the Hydra thrust nozzles from the right-stick vertical axis.
 void CPlane__nozzle_manual(void *self, int pad) {
@@ -583,6 +610,10 @@ static void controls_defaults(void) {
   g_remap[35] = 0;   // WEAPON_ZOOM_OUT-> CROSS
   g_remap[36] = 7;   // TARGETING(aim)-> R1
   g_remap[37] = 10;  // VEHICLE_BOMB  -> DPAD_LEFT
+  g_remap[38] = 6;   // TURRET_LEFT (yaw left)   ZL(68) -> L1(6)
+  g_remap[39] = 7;   // TURRET_RIGHT (yaw right) ZR(69) -> R1(7)
+  g_remap[95] = 0;   // vehicle gun fire         L1(6)  -> CROSS(0)
+  g_remap[88] = 0;   // aircraft flare/2nd wpn   R1(7)  -> CROSS(0)
 }
 
 static const struct { const char *n; int v; } remap_actions[] = {
@@ -595,6 +626,8 @@ static const struct { const char *n; int v; } remap_actions[] = {
   {"MAPPING_MISSION_START_AND_CANCEL",22},{"MAPPING_MISSION_START_AND_CANCEL_VIGILANTE",23},
   {"MAPPING_SWAP_WEAPONS_AND_PURCHASE",33},{"MAPPING_WEAPON_ZOOM_IN",34},{"MAPPING_WEAPON_ZOOM_OUT",35},
   {"MAPPING_ENTER_AND_EXIT_TARGETING",36},{"MAPPING_VEHICLE_BOMB",37},
+  {"MAPPING_TURRET_LEFT",38},{"MAPPING_TURRET_RIGHT",39},
+  {"MAPPING_VEHICLE_GUN_FIRE",95},{"MAPPING_AIRCRAFT_FLARE",88},
 };
 static const struct { const char *n; int v; } remap_buttons[] = {
   {"BUTTON_UNUSED",-1},{"BUTTON_CROSS",0},{"BUTTON_CIRCLE",1},{"BUTTON_SQUARE",2},
@@ -917,6 +950,14 @@ void patch_game(void) {
     hook_arm64(
         so_find_addr(&game_mod, "_ZN6CPlane20ProcessControlInputsEh") + 0x5D4,
         (uintptr_t)CPlane__nozzle_stub);
+
+    // Yaw on L1/R1: redirect the plane rudder's stick read (+0x220) to the physical
+    // L1/R1 buttons (g_l1_down/g_r1_down). Rejoins at +0x230. Stick keeps roll.
+    cplane_rudder_ret =
+        so_find_addr_rx(&game_mod, "_ZN6CPlane20ProcessControlInputsEh") + 0x230;
+    hook_arm64(
+        so_find_addr(&game_mod, "_ZN6CPlane20ProcessControlInputsEh") + 0x220,
+        (uintptr_t)CPlane__rudder_turret_stub);
   }
 
   // Water physics fix.
@@ -1025,6 +1066,46 @@ void patch_game(void) {
     uint32_t *fots = (uint32_t *)so_find_addr(
         &game_mod, "_ZN11CPlayerInfo17FindObjectToStealEP4CPed");
     fots[0x15c / 4] = 0x1e2e1001u; // fmov s1, #1.0 (was #2.25)
+  }
+
+  // Cars and peds don't despawn when you look away (re3 ExtOffscreenDespRange).
+  if (config.no_offscreen_despawn &&
+      so_try_find_addr_rx(&game_mod, "_ZN8CCarCtrl21PossiblyRemoveVehicleEP8CVehicle")) {
+    uint32_t *prv = (uint32_t *)so_find_addr(
+        &game_mod, "_ZN8CCarCtrl21PossiblyRemoveVehicleEP8CVehicle");
+    prv[0x10c / 4] = 0x1400001Bu; // +0x10c: tbnz w0,#0,+0x178 -> b +0x178 (skip off-screen block)
+  }
+  if (config.no_offscreen_despawn &&
+      so_try_find_addr_rx(&game_mod, "_ZN11CPopulation9ManagePedEP4CPedRK7CVector")) {
+    uint32_t *mp = (uint32_t *)so_find_addr(
+        &game_mod, "_ZN11CPopulation9ManagePedEP4CPedRK7CVector");
+    mp[0x1ec / 4] = 0x14000026u; // +0x1ec: b.le +0x284 -> b +0x284 (always keep)
+  }
+
+  // Fix near-clipping issues (JPatch FixNearClippingIssues, "WarDrum's dirty hands").
+  if (so_try_find_addr_rx(&game_mod, "_Z11RenderSceneb")) {
+    uint32_t *rs = (uint32_t *)so_find_addr(&game_mod, "_Z11RenderSceneb");
+    rs[0x68 / 4] = 0x1E204120u; // fadd s0,s9,s10 -> fmov s0, s9
+  }
+
+  // Taxi "for hire" light: post-hook CAutomobile::Render.
+  if (so_try_find_addr_rx(&game_mod, "_ZN11CAutomobile6RenderEv") &&
+      so_try_find_addr_rx(&game_mod, "_ZN11CAutomobile12SetTaxiLightEb")) {
+    g_set_taxi_light = (void (*)(void *, int))so_find_addr_rx(
+        &game_mod, "_ZN11CAutomobile12SetTaxiLightEb");
+    caut_render_cont =
+        so_find_addr_rx(&game_mod, "_ZN11CAutomobile6RenderEv") + 16;
+    hook_arm64(so_find_addr(&game_mod, "_ZN11CAutomobile6RenderEv"),
+               (uintptr_t)CAutomobile__Render_hook);
+  }
+
+  // Fix underwater airbubbles coming from CJ's jaw instead of his mouth (JPatch
+  // AirBubblesFromJaw).
+  if (so_try_find_addr_rx(&game_mod, "_ZN15CTaskSimpleSwim14ProcessEffectsEP4CPed")) {
+    uint32_t *pe = (uint32_t *)so_find_addr(
+        &game_mod, "_ZN15CTaskSimpleSwim14ProcessEffectsEP4CPed");
+    pe[0x5a8 / 4] = 0xB9423808u; // ldr w8,[x0,#248] -> ldr w8,[x0,#568]  (z)
+    pe[0x5ac / 4] = 0xF9411809u; // ldr x9,[x0,#240] -> ldr x9,[x0,#560]  (x,y)
   }
 
   // Always draw the wanted-level stars (config-gated, default off).

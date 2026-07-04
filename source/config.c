@@ -23,7 +23,8 @@
   CONFIG_VAR_INT(sprint_any_surface); \
   CONFIG_VAR_INT(remove_air_resistance); \
   CONFIG_VAR_INT(show_wanted_stars); \
-  CONFIG_VAR_INT(disable_ped_spec);
+  CONFIG_VAR_INT(disable_ped_spec); \
+  CONFIG_VAR_INT(no_offscreen_despawn);
 
 Config config;
 
@@ -55,6 +56,7 @@ int read_config(const char *file) {
   config.remove_air_resistance = 0; // off by default (stock)
   config.show_wanted_stars = 0;     // off by default (stock: stars only when wanted)
   config.disable_ped_spec = 1;      // on by default (remove ped/character specular shine)
+  config.no_offscreen_despawn = 1;  // on by default (cars/peds stay off-screen)
 
   FILE *f = fopen(file, "r");
   if (f == NULL)
