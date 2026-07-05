@@ -650,6 +650,7 @@ static void controls_defaults(void) {
   g_remap[88] = 0;   // aircraft flare/2nd wpn   R1(7)  -> CROSS(0)
   g_remap[64] = 1;   // MENU_ACCEPT  -> CIRCLE (Switch A)
   g_remap[65] = 0;   // MENU_BACK    -> CROSS  (Switch B)
+  g_remap[82] = 1;   // MAP place-waypoint -> CIRCLE (Switch A)
 }
 
 static const struct { const char *n; int v; } remap_actions[] = {
@@ -1049,6 +1050,36 @@ void patch_game(void) {
         uint32_t *fn = (uint32_t *)so_find_addr(&game_mod, find_uvs[i]);
         fn[0x3c / 4] = eor_w21_w11_1; // `mov w21,w11` -> `eor w21,w11,#1`
       }
+  }
+
+  // Hide the mobile-only touch widgets (config.mobile_widgets, default 0 = hide).
+  if (!config.mobile_widgets) {
+    if (so_try_find_addr_rx(&game_mod, "_ZN4CHud13DrawAfterFadeEv")) {
+      uint32_t *fn = (uint32_t *)so_find_addr(&game_mod, "_ZN4CHud13DrawAfterFadeEv");
+      fn[0x164 / 4] = 0xD503201F; // bl CWidgetButton::Draw (skip button)
+    }
+    if (so_try_find_addr_rx(&game_mod, "_ZN8CCredits13RenderCreditsEv")) {
+      uint32_t *fn = (uint32_t *)so_find_addr(&game_mod, "_ZN8CCredits13RenderCreditsEv");
+      fn[0x60c4 / 4] = 0xD503201F; // bl CWidgetButton::Draw (skip button)
+    }
+
+    if (so_try_find_addr_rx(&game_mod, "_ZN4CPad6UpdateEs")) {
+      uint32_t *fn = (uint32_t *)so_find_addr(&game_mod, "_ZN4CPad6UpdateEs");
+      fn[0x584 / 4] = 0xD503201F; // cbz w8 -> nop (matches the Vita steering-popup NOP)
+    }
+
+    if (so_try_find_addr_rx(&game_mod, "_ZN14ControlsScreenC2Ev")) {
+      uint32_t *fn = (uint32_t *)so_find_addr(&game_mod, "_ZN14ControlsScreenC2Ev");
+      fn[0x98 / 4] = 0xD503201F;  // Change button position
+      fn[0xd8 / 4] = 0xD503201F;  // Touch Layout
+      fn[0x108 / 4] = 0xD503201F; // Touch Steering
+    }
+  }
+
+  if (so_try_find_addr_rx(&game_mod, "_ZN10GameScreenC2Ev")) {
+    uint32_t *fn = (uint32_t *)so_find_addr(&game_mod, "_ZN10GameScreenC2Ev");
+    fn[0x148 / 4] = 0xD503201F; // AddItem: Sign in to Social Club
+    fn[0x17c / 4] = 0xD503201F; // AddItem: blank leftover row
   }
 
   // Emergency-vehicle / widescreen FOV fix.

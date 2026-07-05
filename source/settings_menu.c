@@ -152,7 +152,7 @@ static void begin_frame(void) {
 
 static void draw_splash(void) {
   fill(0, 0, FB_W, FB_H, C_BG);
-  const char *t = "GTA : San Andreas NX";
+  const char *t = "GTA: San Andreas NX";
   text((FB_W - text_w(t)) / 2, 296, t, C_AMBER);
   fill((FB_W - 360) / 2, 344, 360, 2, C_ROWSEL);
   const char *s = "Hold  ZR  for Mod Settings";
@@ -165,8 +165,8 @@ static void draw_menu(const MenuItem *items, int n, int cursor) {
   // title bar
   fill(0, 0, FB_W, TITLE_H, C_BAR);
   fill(0, TITLE_H - 2, FB_W, 2, C_AMBER);
-  text(28, 14, "GTA : San Andreas", C_AMBER);
-  text(28 + text_w("GTA : San Andreas") + GLYPH_ADV, 14, "NX", C_TEXT);
+  text(28, 14, "GTA: San Andreas", C_AMBER);
+  text(28 + text_w("GTA: San Andreas") + GLYPH_ADV, 14, "NX", C_TEXT);
   const char *sub = "MOD SETTINGS";
   text(FB_W - 28 - text_w(sub), 18, sub, C_MUTED);
 
@@ -230,6 +230,7 @@ void settings_menu_maybe_show(void) {
       {"Remove \"ExtraAirResistance\"", &config.remove_air_resistance},
       {"Sprint on any surface", &config.sprint_any_surface},
       {"Trilinear filtering", &config.trilinear_filter},
+      {"Mobile Widgets", &config.mobile_widgets},
       {"FPS counter (may stall)", &config.show_fps},
   };
   const int n = (int)(sizeof(items) / sizeof(items[0]));
