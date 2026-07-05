@@ -45,6 +45,8 @@ forwarder.
 
 Save games and settings are stored in `/switch/gtasa/`.
 
+See the [CHANGELOG.md](CHANGELOG.md) for everything that changed.
+
 The port has a config file at `/switch/gtasa/config.txt`, created on first run:
 * `screen_width` / `screen_height` — render resolution; `-1` picks 1280x720 in
   handheld and 1920x1080 docked
@@ -57,6 +59,7 @@ The port has a config file at `/switch/gtasa/config.txt`, created on first run:
 * `show_wanted_stars` — `0` Always drawable wanted stars
 * `disable_ped_spec` — `1` Removed specular lighting on pedestrians
 * `no_offscreen_despawn` — `0` Cars and peds don't despawn when you look away
+* `mobile_widgets` — `0` Hidden Mobile Widgets
 
 ### How to build
 
@@ -73,6 +76,8 @@ Then run `make` (with `DEVKITPRO` set in the environment).
 
 ### Credits
 
+* Gameplay and engine improvements ported from the [GTA:SA PS Vita port](https://github.com/TheOfficialFloW/gtasa_vita).
+* Extra patches and hooks adapted from [JPatch](https://github.com/AndroidModLoader/JPatch).
 * TheOfficialFloW for the method and the original PS Vita work;
 * fgsfds for max_nx, which the shared Switch platform layer is based on;
 
