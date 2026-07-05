@@ -49,6 +49,9 @@ typedef struct {
   int show_wanted_stars;     // CWidgetPlayerInfo::DrawWanted: always draw the stars
   int disable_ped_spec;      // BuildPixelSource: drop BONE3|BONE4 from the spec gate
   int no_offscreen_despawn;  // cars/peds don't despawn off-screen (re3); perf cost
+  int mobile_widgets;        // 1 = show the mobile-only touch widgets; 0 (default) =
+                             // hide them (steering-method popup, cutscene-skip button,
+                             // and the 3 touch rows in the controls menu)
 } Config;
 
 extern Config config;

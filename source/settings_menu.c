@@ -230,6 +230,7 @@ void settings_menu_maybe_show(void) {
       {"Remove \"ExtraAirResistance\"", &config.remove_air_resistance},
       {"Sprint on any surface", &config.sprint_any_surface},
       {"Trilinear filtering", &config.trilinear_filter},
+      {"Mobile Widgets", &config.mobile_widgets},
       {"FPS counter (may stall)", &config.show_fps},
   };
   const int n = (int)(sizeof(items) / sizeof(items[0]));
