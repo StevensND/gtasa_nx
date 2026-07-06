@@ -581,9 +581,6 @@ int main(void) {
 
     implOnDrawFrame(fake_env, NULL, dt);
 
-    // keep movie playback going when the game stops rendering during it
-    jni_video_tick();
-
     if (boot_frames < 10) {
       if (++boot_frames == 10)
         cpu_boost(0);
