@@ -811,14 +811,6 @@ void patch_game(void) {
   if (so_try_find_addr_rx(&game_mod, "_Z12Menu_ShowNagv"))
     hook_arm64(so_find_addr(&game_mod, "_Z12Menu_ShowNagv"), (uintptr_t)ret0);
 
-  // Ignore side mission buttons (vigilante, paramedic, etc)
-  if (so_try_find_addr_rx(&game_mod, "_ZN25CWidgetButtonMissionStart6UpdateEv"))
-    hook_arm64(so_find_addr(&game_mod, "_ZN25CWidgetButtonMissionStart6UpdateEv"),
-               (uintptr_t)ret0);
-  if (so_try_find_addr_rx(&game_mod, "_ZN26CWidgetButtonMissionCancel6UpdateEv"))
-    hook_arm64(so_find_addr(&game_mod, "_ZN26CWidgetButtonMissionCancel6UpdateEv"),
-               (uintptr_t)ret0);
-
   // Ignore cloud saves
   if (so_try_find_addr_rx(&game_mod, "UseCloudSaves"))
     *(uint8_t *)so_find_addr(&game_mod, "UseCloudSaves") = 0;
@@ -1074,6 +1066,13 @@ void patch_game(void) {
       fn[0xd8 / 4] = 0xD503201F;  // Touch Layout
       fn[0x108 / 4] = 0xD503201F; // Touch Steering
     }
+    // Ignore side-mission touch buttons (vigilante, paramedic, firefighter, taxi.)
+    if (so_try_find_addr_rx(&game_mod, "_ZN25CWidgetButtonMissionStart6UpdateEv"))
+      hook_arm64(so_find_addr(&game_mod, "_ZN25CWidgetButtonMissionStart6UpdateEv"),
+                 (uintptr_t)ret0);
+    if (so_try_find_addr_rx(&game_mod, "_ZN26CWidgetButtonMissionCancel6UpdateEv"))
+      hook_arm64(so_find_addr(&game_mod, "_ZN26CWidgetButtonMissionCancel6UpdateEv"),
+                 (uintptr_t)ret0);		  
   }
 
   if (so_try_find_addr_rx(&game_mod, "_ZN10GameScreenC2Ev")) {

@@ -41,6 +41,7 @@
 - Cars and peds no longer despawn when you look away
 - Fixed the second siren
 - Cheat support (R3+L3)
+- Restoring The Cut Songs
 
 ### Saves & Stability
 - Resume now loads the latest save
