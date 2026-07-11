@@ -768,6 +768,22 @@ static void emu_DistanceFogSetup_fogwall(float minD, float maxD, float r, float 
   }
 }
 
+// LimitSandDustBulletParticles (fastman92 JPatch / TheOfficialFloW).
+static volatile int *CTimer_ms_time; // CTimer::m_snTimeInMilliseconds
+static int SurfaceInfos_GetBulletFx_limited(void *surfInfos, uint32_t surfId) {
+  uint32_t w = *(uint32_t *)((char *)surfInfos + surfId * 12 + 146);
+  int fx = (int)((w >> 8) & 7);
+  if (fx == 2 || fx == 4) { // BULLETFX_SAND / BULLETFX_DUST
+    static uint32_t next_tick;
+    uint32_t now = (uint32_t)*CTimer_ms_time;
+    if (next_tick < now)
+      next_tick = now + 100; // let one heavy dust puff through per 100ms
+    else
+      return 0; // BULLETFX_NOTHING — suppress the rest
+  }
+  return fx;
+}
+
 void patch_game(void) {
   // replace the NVThread JNI-thread spawner (NULL-faults on named threads)
   if (so_try_find_addr_rx(&game_mod, "_Z22NVThreadSpawnJNIThreadPlPK14pthread_attr_tPKcPFPvS5_ES5_"))
@@ -858,6 +874,16 @@ void patch_game(void) {
     fn[0x334 / 4] = 0x5280011c; // mov w28, #8       (stride advance: 4 -> 8)
     fn[0x338 / 4] = 0x52800099; // mov w25, #4       (index comps: 3 -> 4)
     fn[0x340 / 4] = 0x5280003a; // mov w26, #1       (short-format flag: 0 -> 1)
+  }
+
+  // Limit sand/dust bullet-impact particles (perf; see SurfaceInfos_GetBulletFx_
+  // limited). GetBulletFx is 20 bytes so hook_arm64's 16-byte write is safe here.
+  if (so_try_find_addr_rx(&game_mod, "_ZN14SurfaceInfos_c11GetBulletFxEj") &&
+      so_try_find_addr_rx(&game_mod, "_ZN6CTimer22m_snTimeInMillisecondsE")) {
+    CTimer_ms_time =
+        (int *)so_find_addr_rx(&game_mod, "_ZN6CTimer22m_snTimeInMillisecondsE");
+    hook_arm64(so_find_addr(&game_mod, "_ZN14SurfaceInfos_c11GetBulletFxEj"),
+               (uintptr_t)SurfaceInfos_GetBulletFx_limited);
   }
 
   // Fix Second Siren.

@@ -231,6 +231,7 @@ void settings_menu_maybe_show(void) {
       {"Sprint on any surface", &config.sprint_any_surface},
       {"Trilinear filtering", &config.trilinear_filter},
       {"Mobile Widgets", &config.mobile_widgets},
+      {"FuzzySeek (mpg123)", &config.fuzzy_seek},
       {"FPS counter", &config.show_fps},
   };
   const int n = (int)(sizeof(items) / sizeof(items[0]));
