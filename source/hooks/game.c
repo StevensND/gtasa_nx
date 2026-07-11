@@ -807,9 +807,9 @@ void patch_game(void) {
   // main-thread stack-guard TLS
   init_fake_tls(main_fake_tls);
 
-  // Ignore app rating popup
+  // Ignore app rating popup.
   if (so_try_find_addr_rx(&game_mod, "_Z12Menu_ShowNagv"))
-    hook_arm64(so_find_addr(&game_mod, "_Z12Menu_ShowNagv"), (uintptr_t)ret0);
+    *(uint32_t *)so_find_addr(&game_mod, "_Z12Menu_ShowNagv") = 0xd65f03c0; // RET
 
   // Ignore cloud saves
   if (so_try_find_addr_rx(&game_mod, "UseCloudSaves"))
