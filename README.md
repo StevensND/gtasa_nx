@@ -64,6 +64,8 @@ The port has a config file at `/switch/gtasa/config.txt`, created on first run:
 - You can input PC cheats by pressing **R3** + **L3** to open the on-screen keyboard. See [CHEATS.md](CHEATS.md) for available and unavailable cheats (you can input cheat codes in lowercase as well as uppercase).
 - Due to expired licensing, some songs were cut from the game. See [MUSIC.md](MUSIC.md) for a list of removed tracks and a guide on how to restore them.
 - Console-style HUD (optional). Drop a custom `Adjustable.cfg` into `switch/gtasa/` for the console HUD (e.g. radar in the bottom-left corner). Since **v2.11.311** no longer includes `data/360Default1280x720.cfg`, take it from the older **v2.10** build and rename it to `Adjustable.cfg`. It's a leftover from the Xbox 360 version.
+- In order to reduce occasional stutters in-game, delete both `switch/gtasa/scache_small_low.txt` and `switch/gtasa/scache_small.txt`, then create a copy of the `switch/gtasa/scache.txt` file to have two version of it. (for example `scache(1).txt` so in the end you end up with both `scache.txt` and `scache(1).txt` inside the `switch/gtasa/` folder), then rename `scache.txt` to `scache_small.txt` and `scache(1).txt` to `scache_small_low.txt` . This will however make the loading screen longer since it needs to compile more shaders ahead.
+  - If the folder `switch/gtasa/shadercache/mesa_shader_cache` contains much more than 300 folders, it's recommended to delete the folder and have it rebuilt.
 
 ### Mod Settings Menu
 
