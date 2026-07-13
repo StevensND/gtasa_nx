@@ -32,6 +32,7 @@
 - Fixed broken facial expressions
 - Fixed near-clipping issues
 - Fixed underwater air bubbles coming from CJ's jaw instead of his mouth
+- Persistent shader cache across launches (fewer stutters after the first run)
 
 ### Gameplay & Physics
 - Water physics and swimming mechanics fixes
@@ -42,6 +43,7 @@
 - Fixed the second siren
 - Cheat support (R3+L3)
 - Restoring The Cut Songs
+- FuzzySeek for mpg123 — snappier radio station switching, less SD card I/O (toggle in mod menu, on by default)
 
 ### Saves & Stability
 - Resume now loads the latest save

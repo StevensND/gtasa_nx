@@ -604,6 +604,19 @@ static unsigned int slCreateEngine_fake(void) {
   return 0x0000000C; // SL_RESULT_FEATURE_UNSUPPORTED
 }
 
+// FuzzySeek (port of TheOfficialFloW's GTA_FuzzySeek / fastman92 JPatch): add
+// MPG123_FUZZY|SEEKBUFFER|GAPLESS when the game configures its mp3 decoder flags,
+// so mpg123 skips loading useless data on seeks -> less SD I/O and snappier radio
+// station switching. The game imports mpg123_param, so we just wrap it here (no
+// hook needed). Gated on the flags keys so non-flag param calls pass through
+// untouched.
+static int mpg123_param_fuzzy(mpg123_handle *mh, enum mpg123_parms type,
+                              long value, double fvalue) {
+  if (config.fuzzy_seek && (type == MPG123_FLAGS || type == MPG123_ADD_FLAGS))
+    value |= MPG123_FUZZY | MPG123_SEEKBUFFER | MPG123_GAPLESS;
+  return mpg123_param(mh, type, value, fvalue);
+}
+
 // import table
 
 DynLibFunction dynlib_functions[] = {
@@ -1120,7 +1133,7 @@ DynLibFunction dynlib_functions[] = {
   { "alcGetProcAddress", (uintptr_t)&alcGetProcAddress },
   { "alcProcessContext", (uintptr_t)&alcProcessContext },
   { "alcSuspendContext", (uintptr_t)&alcSuspendContext },
-  { "mpg123_param", (uintptr_t)&mpg123_param },
+  { "mpg123_param", (uintptr_t)&mpg123_param_fuzzy }, // FuzzySeek (see wrapper)
 
   // imports of the C++ runtime donor (the APK's libopenal.so)
   { "__assert2", (uintptr_t)&__assert2 },

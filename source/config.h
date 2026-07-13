@@ -52,6 +52,8 @@ typedef struct {
   int mobile_widgets;        // 1 = show the mobile-only touch widgets; 0 (default) =
                              // hide them (steering-method popup, cutscene-skip button,
                              // and the 3 touch rows in the controls menu)
+  int fuzzy_seek;            // 1 (default) = OR MPG123_FUZZY|SEEKBUFFER|GAPLESS into
+                             // mpg123 flag calls (TheOfficialFloW's FuzzySeek port)
 } Config;
 
 extern Config config;
